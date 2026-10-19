@@ -17,5 +17,12 @@ dependencyResolutionManagement {
 
 rootProject.name = "ug-cuda-kotlin"
 
-includeBuild("../cudarc-kotlin")
-includeBuild("../ug-kotlin")
+listOf(
+    "../half-kotlin",
+    "../cudarc-kotlin",
+    "../ug-kotlin",
+).forEach { path ->
+    if (file(path).exists()) {
+        includeBuild(path)
+    }
+}
