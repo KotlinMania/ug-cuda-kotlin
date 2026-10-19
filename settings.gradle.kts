@@ -16,3 +16,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ug-cuda-kotlin"
+
+includeBuild("../cudarc-kotlin")
+includeBuild("../ug-kotlin")
