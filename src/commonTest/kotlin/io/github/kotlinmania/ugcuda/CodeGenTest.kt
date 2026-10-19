@@ -2,20 +2,19 @@ package io.github.kotlinmania.ugcuda
 
 import io.github.kotlinmania.ug.Const
 import io.github.kotlinmania.ug.DType
-import io.github.kotlinmania.ug.op.Arg
-import io.github.kotlinmania.ug.op.ArgType
-import io.github.kotlinmania.ug.op.BinaryOp
-import io.github.kotlinmania.ug.op.ReduceOp
-import io.github.kotlinmania.ug.op.UnaryOp
+import io.github.kotlinmania.ug.lang.Arg
+import io.github.kotlinmania.ug.lang.BinaryOp
+import io.github.kotlinmania.ug.lang.LaunchConfig
+import io.github.kotlinmania.ug.lang.ReduceOp
+import io.github.kotlinmania.ug.lang.UnaryOp
 import io.github.kotlinmania.ug.lang.ssa.A as SsaA
 import io.github.kotlinmania.ug.lang.ssa.Instr
 import io.github.kotlinmania.ug.lang.ssa.Kernel
 import io.github.kotlinmania.ug.lang.ssa.KernelArg
-import io.github.kotlinmania.ug.lang.ssa.LaunchConfig
 import io.github.kotlinmania.ug.lang.ssa.Special
 import io.github.kotlinmania.ug.lang.ssa.VarId
-import io.github.kotlinmania.ugcuda.codegen.CodeGen
 import io.github.kotlinmania.ugcuda.codegen.fmtF32
+import io.github.kotlinmania.ugcuda.codegen.gen
 import io.github.kotlinmania.ugcuda.gemm.gemmReducedPrecisionBf16
 import io.github.kotlinmania.ugcuda.gemm.gemmReducedPrecisionF16
 import io.github.kotlinmania.ugcuda.gemm.gemmReducedPrecisionF32
@@ -80,15 +79,15 @@ class CodeGenTest {
                 Instr.Store(VarId(2), SsaA.Var(VarId(3)), SsaA.Var(VarId(6)), DType.F32),
             ),
             args = listOf(
-                KernelArg(Arg(ArgType.Ptr(DType.F32)), 0),
-                KernelArg(Arg(ArgType.Ptr(DType.F32)), 1),
-                KernelArg(Arg(ArgType.Ptr(DType.F32)), 2),
+                KernelArg(Arg.ptr(DType.F32), 0),
+                KernelArg(Arg.ptr(DType.F32), 1),
+                KernelArg(Arg.ptr(DType.F32), 2),
             ),
             launchConfig = LaunchConfig(gridDim = 1, blockDim = 1024, sharedMem = 0),
         )
 
         val code = buildString {
-            CodeGen.gen(this, "add_kernel", kernel)
+            gen(this, "add_kernel", kernel)
         }
 
         assertTrue(code.contains("extern \"C\" __global__ void add_kernel("))
@@ -115,14 +114,14 @@ class CodeGenTest {
                 Instr.Store(VarId(1), SsaA.Constant(Const.I32(0)), SsaA.Var(VarId(4)), DType.F32),
             ),
             args = listOf(
-                KernelArg(Arg(ArgType.Ptr(DType.F32)), 0),
-                KernelArg(Arg(ArgType.Ptr(DType.F32)), 1),
+                KernelArg(Arg.ptr(DType.F32), 0),
+                KernelArg(Arg.ptr(DType.F32), 1),
             ),
             launchConfig = LaunchConfig(gridDim = 1, blockDim = 32, sharedMem = 0),
         )
 
         val code = buildString {
-            CodeGen.gen(this, "reduce_kernel", kernel)
+            gen(this, "reduce_kernel", kernel)
         }
 
         assertTrue(code.contains("block_reduce_sum"))
