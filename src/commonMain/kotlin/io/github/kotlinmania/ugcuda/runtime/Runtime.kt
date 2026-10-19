@@ -19,7 +19,6 @@ import io.github.kotlinmania.half.F16
 import io.github.kotlinmania.ug.DType
 import io.github.kotlinmania.ug.Layout
 import io.github.kotlinmania.ug.UgError
-import io.github.kotlinmania.ug.WithDType
 import io.github.kotlinmania.ug.lang.ssa.Kernel
 import io.github.kotlinmania.ugcuda.codegen.gen
 import io.github.kotlinmania.ugcuda.gemm.matmul as gemmMatmul
@@ -114,8 +113,32 @@ public object ToSliceI64 : ToSlice<Long> {
 
 public class Slice(
     internal var inner: SliceInner,
-    internal val device: Device,
+    override val device: Device,
 ) : io.github.kotlinmania.ug.Slice {
+    override val dtype: DType
+        get() = when (inner) {
+            is SliceInner.F32 -> DType.F32
+            is SliceInner.F16Val -> DType.F16
+            is SliceInner.Bf16Val -> DType.BF16
+            is SliceInner.I32 -> DType.I32
+            is SliceInner.I64 -> DType.I64
+        }
+
+    override val len: Int
+        get() = when (val s = inner) {
+            is SliceInner.F32 -> s.slice.len
+            is SliceInner.F16Val -> s.slice.len
+            is SliceInner.Bf16Val -> s.slice.len
+            is SliceInner.I32 -> s.slice.len
+            is SliceInner.I64 -> s.slice.len
+        }
+
+    public fun dtype(): DType = dtype
+
+    public fun device(): Device = device
+
+    public fun len(): Int = len
+
     public fun <D> slice(toSlice: ToSlice<D>): CudaSlice<D> =
         toSlice.slice(this)
 
@@ -137,95 +160,87 @@ public class Slice(
             is SliceInner.I64 -> s.slice.devicePtrMut(stream)
         }
 
-    override fun dtype(): DType =
-        when (inner) {
-            is SliceInner.F32 -> DType.F32
-            is SliceInner.F16Val -> DType.F16
-            is SliceInner.Bf16Val -> DType.BF16
-            is SliceInner.I32 -> DType.I32
-            is SliceInner.I64 -> DType.I64
-        }
+    override fun copyHostToDevice(src: FloatArray) {
+        val s = inner as? SliceInner.F32 ?: throw UgError.Msg("htod dtype mismatch, dst $dtype, src ${DType.F32}")
+        device.cudarcStream().memcpyHtod(src.toList(), s.slice).getOrThrow()
+    }
 
-    override fun device(): io.github.kotlinmania.ug.Device = device
+    override fun copyHostToDevice(src: IntArray) {
+        val s = inner as? SliceInner.I32 ?: throw UgError.Msg("htod dtype mismatch, dst $dtype, src ${DType.I32}")
+        device.cudarcStream().memcpyHtod(src.toList(), s.slice).getOrThrow()
+    }
 
-    override fun <DT : WithDType> copyHostToDevice(src: List<DT>) {
-        when (val s = inner) {
-            is SliceInner.Bf16Val -> {
-                val list = src.map { it.toBf16() }
-                device.cudarcStream().memcpyHtod(list, s.slice).getOrThrow()
-            }
-            is SliceInner.F16Val -> {
-                val list = src.map { it.toF16() }
-                device.cudarcStream().memcpyHtod(list, s.slice).getOrThrow()
-            }
-            is SliceInner.F32 -> {
-                val list = src.map { it.toFloat() }
-                device.cudarcStream().memcpyHtod(list, s.slice).getOrThrow()
-            }
-            is SliceInner.I32 -> {
-                val list = src.map { it.toInt() }
-                device.cudarcStream().memcpyHtod(list, s.slice).getOrThrow()
-            }
-            is SliceInner.I64 -> {
-                val list = src.map { it.toLong() }
-                device.cudarcStream().memcpyHtod(list, s.slice).getOrThrow()
-            }
+    override fun copyHostToDevice(src: LongArray) {
+        val s = inner as? SliceInner.I64 ?: throw UgError.Msg("htod dtype mismatch, dst $dtype, src ${DType.I64}")
+        device.cudarcStream().memcpyHtod(src.toList(), s.slice).getOrThrow()
+    }
+
+    override fun copyHostToDevice(src: Array<F16>) {
+        val s = inner as? SliceInner.F16Val ?: throw UgError.Msg("htod dtype mismatch, dst $dtype, src ${DType.F16}")
+        device.cudarcStream().memcpyHtod(src.toList(), s.slice).getOrThrow()
+    }
+
+    override fun copyHostToDevice(src: Array<BF16>) {
+        val s = inner as? SliceInner.Bf16Val ?: throw UgError.Msg("htod dtype mismatch, dst $dtype, src ${DType.BF16}")
+        device.cudarcStream().memcpyHtod(src.toList(), s.slice).getOrThrow()
+    }
+
+    override fun copyDeviceToHost(dst: FloatArray) {
+        val s = inner as? SliceInner.F32 ?: throw UgError.Msg("dtoh dtype mismatch, dst ${DType.F32}, src $dtype")
+        val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
+        for (i in list.indices) {
+            dst[i] = list[i]
         }
     }
 
-    override fun <DT : WithDType> copyDeviceToHost(dst: MutableList<DT>) {
-        when (val s = inner) {
-            is SliceInner.Bf16Val -> {
-                val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
-                dst.clear()
-                for (item in list) {
-                    dst.add(DT.fromBf16(item))
-                }
-            }
-            is SliceInner.F16Val -> {
-                val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
-                dst.clear()
-                for (item in list) {
-                    dst.add(DT.fromF16(item))
-                }
-            }
-            is SliceInner.F32 -> {
-                val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
-                dst.clear()
-                for (item in list) {
-                    dst.add(DT.fromFloat(item))
-                }
-            }
-            is SliceInner.I32 -> {
-                val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
-                dst.clear()
-                for (item in list) {
-                    dst.add(DT.fromInt(item))
-                }
-            }
-            is SliceInner.I64 -> {
-                val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
-                dst.clear()
-                for (item in list) {
-                    dst.add(DT.fromLong(item))
-                }
-            }
+    override fun copyDeviceToHost(dst: IntArray) {
+        val s = inner as? SliceInner.I32 ?: throw UgError.Msg("dtoh dtype mismatch, dst ${DType.I32}, src $dtype")
+        val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
+        for (i in list.indices) {
+            dst[i] = list[i]
         }
     }
 
-    override fun len(): Int =
-        when (val s = inner) {
-            is SliceInner.F32 -> s.slice.len
-            is SliceInner.F16Val -> s.slice.len
-            is SliceInner.Bf16Val -> s.slice.len
-            is SliceInner.I32 -> s.slice.len
-            is SliceInner.I64 -> s.slice.len
+    override fun copyDeviceToHost(dst: LongArray) {
+        val s = inner as? SliceInner.I64 ?: throw UgError.Msg("dtoh dtype mismatch, dst ${DType.I64}, src $dtype")
+        val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
+        for (i in list.indices) {
+            dst[i] = list[i]
         }
+    }
 
-    public inline fun <reified DT : WithDType> toVec(): List<DT> {
-        val list = mutableListOf<DT>()
-        copyDeviceToHost(list)
-        return list
+    override fun copyDeviceToHost(dst: Array<F16>) {
+        val s = inner as? SliceInner.F16Val ?: throw UgError.Msg("dtoh dtype mismatch, dst ${DType.F16}, src $dtype")
+        val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
+        for (i in list.indices) {
+            dst[i] = list[i]
+        }
+    }
+
+    override fun copyDeviceToHost(dst: Array<BF16>) {
+        val s = inner as? SliceInner.Bf16Val ?: throw UgError.Msg("dtoh dtype mismatch, dst ${DType.BF16}, src $dtype")
+        val list = device.cudarcStream().cloneDtoh(s.slice).getOrThrow()
+        for (i in list.indices) {
+            dst[i] = list[i]
+        }
+    }
+
+    override fun toFloatArray(): FloatArray {
+        val arr = FloatArray(len)
+        copyDeviceToHost(arr)
+        return arr
+    }
+
+    override fun toIntArray(): IntArray {
+        val arr = IntArray(len)
+        copyDeviceToHost(arr)
+        return arr
+    }
+
+    override fun toLongArray(): LongArray {
+        val arr = LongArray(len)
+        copyDeviceToHost(arr)
+        return arr
     }
 }
 
@@ -267,14 +282,37 @@ public class Device internal constructor(
         return Slice(SliceInner.F32(slice), this)
     }
 
-    public fun <D : WithDType> sliceFromValues(vs: List<D>): Slice {
-        val dt = vs.firstOrNull()?.dtype() ?: DType.F32
-        val slice = allocateUninit(dt, vs.size)
+    public fun sliceFromValues(vs: FloatArray): Slice {
+        val slice = allocateUninit(DType.F32, vs.size)
         slice.copyHostToDevice(vs)
         return slice
     }
 
-    public fun synchronize() {
+    public fun sliceFromValues(vs: IntArray): Slice {
+        val slice = allocateUninit(DType.I32, vs.size)
+        slice.copyHostToDevice(vs)
+        return slice
+    }
+
+    public fun sliceFromValues(vs: LongArray): Slice {
+        val slice = allocateUninit(DType.I64, vs.size)
+        slice.copyHostToDevice(vs)
+        return slice
+    }
+
+    public fun sliceFromValues(vs: Array<F16>): Slice {
+        val slice = allocateUninit(DType.F16, vs.size)
+        slice.copyHostToDevice(vs)
+        return slice
+    }
+
+    public fun sliceFromValues(vs: Array<BF16>): Slice {
+        val slice = allocateUninit(DType.BF16, vs.size)
+        slice.copyHostToDevice(vs)
+        return slice
+    }
+
+    override fun synchronize() {
         stream.synchronize().getOrThrow()
     }
 
@@ -304,7 +342,8 @@ public class Device internal constructor(
         return Func(func, stream, launchCfg)
     }
 
-    override fun run(f: Func, args: List<io.github.kotlinmania.ug.Slice>) {
+    override fun run(f: Any, args: List<io.github.kotlinmania.ug.Slice>) {
+        require(f is Func) { "f must be ugcuda.runtime.Func" }
         if (f.cfg.blockDim.x == 0u || f.cfg.blockDim.y == 0u || f.cfg.blockDim.z == 0u ||
             f.cfg.gridDim.x == 0u || f.cfg.gridDim.y == 0u || f.cfg.gridDim.z == 0u) {
             return
@@ -316,6 +355,21 @@ public class Device internal constructor(
             builder.arg(ptr)
         }
         builder.launch(f.cfg).getOrThrow()
+    }
+
+    override fun matmul(
+        dst: io.github.kotlinmania.ug.Slice,
+        lhs: io.github.kotlinmania.ug.Slice,
+        rhs: io.github.kotlinmania.ug.Slice,
+        b: Int,
+        m: Int,
+        n: Int,
+        k: Int,
+        lhsL: Layout,
+        rhsL: Layout,
+    ) {
+        require(dst is Slice && lhs is Slice && rhs is Slice) { "Slices must be ugcuda.runtime.Slice" }
+        gemmMatmul(blas, dst, lhs, rhs, listOf(b, m, n, k), lhsL, rhsL)
     }
 
     override fun matmul(
