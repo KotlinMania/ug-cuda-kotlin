@@ -18,7 +18,7 @@ import io.github.kotlinmania.half.BF16
 import io.github.kotlinmania.half.F16
 import io.github.kotlinmania.ug.DType
 import io.github.kotlinmania.ug.Layout
-import io.github.kotlinmania.ug.UgException
+import io.github.kotlinmania.ug.UgError
 import io.github.kotlinmania.ug.WithDType
 import io.github.kotlinmania.ug.lang.ssa.Kernel
 import io.github.kotlinmania.ugcuda.codegen.gen
@@ -76,7 +76,7 @@ public object ToSliceF32 : ToSlice<Float> {
     override fun slice(s: Slice): CudaSlice<Float> =
         when (val inner = s.inner) {
             is SliceInner.F32 -> inner.slice
-            else -> throw UgException("dtype mismatch, expected ${DType.F32}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.F32}, got ${s.dtype()}")
         }
 }
 
@@ -84,7 +84,7 @@ public object ToSliceF16 : ToSlice<F16> {
     override fun slice(s: Slice): CudaSlice<F16> =
         when (val inner = s.inner) {
             is SliceInner.F16Val -> inner.slice
-            else -> throw UgException("dtype mismatch, expected ${DType.F16}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.F16}, got ${s.dtype()}")
         }
 }
 
@@ -92,7 +92,7 @@ public object ToSliceBf16 : ToSlice<BF16> {
     override fun slice(s: Slice): CudaSlice<BF16> =
         when (val inner = s.inner) {
             is SliceInner.Bf16Val -> inner.slice
-            else -> throw UgException("dtype mismatch, expected ${DType.BF16}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.BF16}, got ${s.dtype()}")
         }
 }
 
@@ -100,7 +100,7 @@ public object ToSliceI32 : ToSlice<Int> {
     override fun slice(s: Slice): CudaSlice<Int> =
         when (val inner = s.inner) {
             is SliceInner.I32 -> inner.slice
-            else -> throw UgException("dtype mismatch, expected ${DType.I32}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.I32}, got ${s.dtype()}")
         }
 }
 
@@ -108,7 +108,7 @@ public object ToSliceI64 : ToSlice<Long> {
     override fun slice(s: Slice): CudaSlice<Long> =
         when (val inner = s.inner) {
             is SliceInner.I64 -> inner.slice
-            else -> throw UgException("dtype mismatch, expected ${DType.I64}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.I64}, got ${s.dtype()}")
         }
 }
 

@@ -15,7 +15,7 @@ import io.github.kotlinmania.cudarc.driver.safe.CudaView
 import io.github.kotlinmania.half.BF16
 import io.github.kotlinmania.half.F16
 import io.github.kotlinmania.ug.Layout
-import io.github.kotlinmania.ug.UgException
+import io.github.kotlinmania.ug.UgError
 import io.github.kotlinmania.ugcuda.runtime.Slice
 import io.github.kotlinmania.ugcuda.runtime.SliceInner
 import kotlin.concurrent.AtomicBoolean
@@ -44,7 +44,7 @@ internal fun <T> gemmConfig(
     } else if ((rhsM1 == k || n == 1) && (rhsM2 == 1 || k == 1)) {
         Pair(k, CublasOperation.CUBLAS_OP_T)
     } else {
-        throw UgException("non contiguous matmul, lhs: $lhsL, rhs: $rhsL")
+        throw UgError.Msg("non contiguous matmul, lhs: $lhsL, rhs: $rhsL")
     }
 
     val (ldb, transb) = if ((lhsM1 == 1 || k == 1) && (lhsM2 == k || m == 1)) {
@@ -52,7 +52,7 @@ internal fun <T> gemmConfig(
     } else if ((lhsM1 == m || k == 1) && (lhsM2 == 1 || m == 1)) {
         Pair(m, CublasOperation.CUBLAS_OP_T)
     } else {
-        throw UgException("non contiguous matmul, lhs: $lhsL, rhs: $rhsL")
+        throw UgError.Msg("non contiguous matmul, lhs: $lhsL, rhs: $rhsL")
     }
 
     val gemm = GemmConfig(
@@ -75,7 +75,7 @@ internal fun <T> gemmConfig(
         lhsLeading.size == 2 && lhsL.dims[1] == 1 -> lhsLeading[0].toLong()
         lhsLeading.size == 1 -> lhsLeading[0].toLong()
         lhsLeading.isEmpty() -> (m * k).toLong()
-        else -> throw UgException("non contiguous matmul, lhs: $lhsL, rhs: $rhsL")
+        else -> throw UgError.Msg("non contiguous matmul, lhs: $lhsL, rhs: $rhsL")
     }
 
     val rhsLeading = rhsStride.subList(0, rhsStride.size - 2)
@@ -85,7 +85,7 @@ internal fun <T> gemmConfig(
         rhsLeading.size == 2 && rhsL.dims[1] == 1 -> rhsLeading[0].toLong()
         rhsLeading.size == 1 -> rhsLeading[0].toLong()
         rhsLeading.isEmpty() -> (n * k).toLong()
-        else -> throw UgException("non contiguous matmul, lhs: $lhsL, rhs: $rhsL")
+        else -> throw UgError.Msg("non contiguous matmul, lhs: $lhsL, rhs: $rhsL")
     }
 
     return StridedBatchedConfig(
@@ -307,7 +307,7 @@ internal fun matmul(
             gemmStridedBatchedF32(stream, blas, cfg, rhsView, lhsView, dstInner.slice).getOrThrow()
         }
         else -> {
-            throw UgException("incorrect dtypes for matmul, dst: $dstDt, lhs: $lhsDt, rhs: $rhsDt")
+            throw UgError.Msg("incorrect dtypes for matmul, dst: $dstDt, lhs: $lhsDt, rhs: $rhsDt")
         }
     }
 }

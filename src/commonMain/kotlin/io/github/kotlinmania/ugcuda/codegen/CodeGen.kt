@@ -3,15 +3,15 @@ package io.github.kotlinmania.ugcuda.codegen
 
 import io.github.kotlinmania.ug.Const
 import io.github.kotlinmania.ug.DType
-import io.github.kotlinmania.ug.UgException
+import io.github.kotlinmania.ug.UgError
+import io.github.kotlinmania.ug.lang.BinaryOp
+import io.github.kotlinmania.ug.lang.ReduceOp
+import io.github.kotlinmania.ug.lang.Type
+import io.github.kotlinmania.ug.lang.UnaryOp
 import io.github.kotlinmania.ug.lang.ssa.A as SsaA
-import io.github.kotlinmania.ug.lang.ssa.BinaryOp
 import io.github.kotlinmania.ug.lang.ssa.Instr
 import io.github.kotlinmania.ug.lang.ssa.Kernel
-import io.github.kotlinmania.ug.lang.ssa.ReduceOp
 import io.github.kotlinmania.ug.lang.ssa.Special
-import io.github.kotlinmania.ug.lang.ssa.Type
-import io.github.kotlinmania.ug.lang.ssa.UnaryOp
 import io.github.kotlinmania.ug.lang.ssa.VarId
 
 public class V(public val id: VarId) {
@@ -115,7 +115,7 @@ public fun gen(w: Appendable, funcName: String, kernel: Kernel) {
             }
             is Instr.EndIf, is Instr.EndRange -> {
                 if (depth == 0) {
-                    throw UgException("unmatched EndRange")
+                    throw UgError.Msg("unmatched EndRange")
                 }
                 depth -= 1
                 val closeIndent = indent(depth - 1)
@@ -181,6 +181,6 @@ public fun gen(w: Appendable, funcName: String, kernel: Kernel) {
     }
     w.append("}\n")
     if (depth > 0) {
-        throw UgException("unmatched Range")
+        throw UgError.Msg("unmatched Range")
     }
 }
