@@ -21,8 +21,8 @@ import io.github.kotlinmania.ug.Layout
 import io.github.kotlinmania.ug.UgError
 import io.github.kotlinmania.ug.lang.ssa.Kernel
 import io.github.kotlinmania.ugcuda.codegen.gen
+import kotlin.concurrent.atomics.AtomicInt
 import io.github.kotlinmania.ugcuda.gemm.matmul as gemmMatmul
-import kotlin.concurrent.AtomicInt
 
 public interface WithErr<T> {
     public fun w(): T
@@ -39,7 +39,7 @@ public data class KernelId(
         private val counter: AtomicInt = AtomicInt(1)
 
         public fun new(): KernelId =
-            KernelId(counter.getAndIncrement())
+            KernelId(counter.fetchAndAdd(1))
     }
 }
 
@@ -59,87 +59,97 @@ public class Func(
     public fun launchCfg(): LaunchConfig = cfg
 }
 
-public sealed class SliceInner {
-    public data class F32(val slice: CudaSlice<Float>) : SliceInner()
-    public data class F16Val(val slice: CudaSlice<F16>) : SliceInner()
-    public data class Bf16Val(val slice: CudaSlice<BF16>) : SliceInner()
-    public data class I32(val slice: CudaSlice<Int>) : SliceInner()
-    public data class I64(val slice: CudaSlice<Long>) : SliceInner()
+internal sealed class SliceInner {
+    internal data class F32(
+        val slice: CudaSlice<Float>,
+    ) : SliceInner()
+
+    internal data class F16Val(
+        val slice: CudaSlice<F16>,
+    ) : SliceInner()
+
+    internal data class Bf16Val(
+        val slice: CudaSlice<BF16>,
+    ) : SliceInner()
+
+    internal data class I32(
+        val slice: CudaSlice<Int>,
+    ) : SliceInner()
+
+    internal data class I64(
+        val slice: CudaSlice<Long>,
+    ) : SliceInner()
 }
 
-public interface ToSlice<T> {
-    public fun slice(s: Slice): CudaSlice<T>
+internal interface ToSlice<T> {
+    fun slice(s: Slice): CudaSlice<T>
 }
 
-public object ToSliceF32 : ToSlice<Float> {
+internal object ToSliceF32 : ToSlice<Float> {
     override fun slice(s: Slice): CudaSlice<Float> =
         when (val inner = s.inner) {
             is SliceInner.F32 -> inner.slice
-            else -> throw UgError.Msg("dtype mismatch, expected ${DType.F32}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.F32}, got ${s.dtype}")
         }
 }
 
-public object ToSliceF16 : ToSlice<F16> {
+internal object ToSliceF16 : ToSlice<F16> {
     override fun slice(s: Slice): CudaSlice<F16> =
         when (val inner = s.inner) {
             is SliceInner.F16Val -> inner.slice
-            else -> throw UgError.Msg("dtype mismatch, expected ${DType.F16}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.F16}, got ${s.dtype}")
         }
 }
 
-public object ToSliceBf16 : ToSlice<BF16> {
+internal object ToSliceBf16 : ToSlice<BF16> {
     override fun slice(s: Slice): CudaSlice<BF16> =
         when (val inner = s.inner) {
             is SliceInner.Bf16Val -> inner.slice
-            else -> throw UgError.Msg("dtype mismatch, expected ${DType.BF16}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.BF16}, got ${s.dtype}")
         }
 }
 
-public object ToSliceI32 : ToSlice<Int> {
+internal object ToSliceI32 : ToSlice<Int> {
     override fun slice(s: Slice): CudaSlice<Int> =
         when (val inner = s.inner) {
             is SliceInner.I32 -> inner.slice
-            else -> throw UgError.Msg("dtype mismatch, expected ${DType.I32}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.I32}, got ${s.dtype}")
         }
 }
 
-public object ToSliceI64 : ToSlice<Long> {
+internal object ToSliceI64 : ToSlice<Long> {
     override fun slice(s: Slice): CudaSlice<Long> =
         when (val inner = s.inner) {
             is SliceInner.I64 -> inner.slice
-            else -> throw UgError.Msg("dtype mismatch, expected ${DType.I64}, got ${s.dtype()}")
+            else -> throw UgError.Msg("dtype mismatch, expected ${DType.I64}, got ${s.dtype}")
         }
 }
 
-public class Slice(
+public class Slice internal constructor(
     internal var inner: SliceInner,
     override val device: Device,
 ) : io.github.kotlinmania.ug.Slice {
     override val dtype: DType
-        get() = when (inner) {
-            is SliceInner.F32 -> DType.F32
-            is SliceInner.F16Val -> DType.F16
-            is SliceInner.Bf16Val -> DType.BF16
-            is SliceInner.I32 -> DType.I32
-            is SliceInner.I64 -> DType.I64
-        }
+        get() =
+            when (inner) {
+                is SliceInner.F32 -> DType.F32
+                is SliceInner.F16Val -> DType.F16
+                is SliceInner.Bf16Val -> DType.BF16
+                is SliceInner.I32 -> DType.I32
+                is SliceInner.I64 -> DType.I64
+            }
 
     override val len: Int
-        get() = when (val s = inner) {
-            is SliceInner.F32 -> s.slice.len
-            is SliceInner.F16Val -> s.slice.len
-            is SliceInner.Bf16Val -> s.slice.len
-            is SliceInner.I32 -> s.slice.len
-            is SliceInner.I64 -> s.slice.len
-        }
+        get() =
+            when (val s = inner) {
+                is SliceInner.F32 -> s.slice.len
+                is SliceInner.F16Val -> s.slice.len
+                is SliceInner.Bf16Val -> s.slice.len
+                is SliceInner.I32 -> s.slice.len
+                is SliceInner.I64 -> s.slice.len
+            }
 
-    public fun dtype(): DType = dtype
-
-    public fun device(): Device = device
-
-    public fun len(): Int = len
-
-    public fun <D> slice(toSlice: ToSlice<D>): CudaSlice<D> =
+    internal fun <D> slice(toSlice: ToSlice<D>): CudaSlice<D> =
         toSlice.slice(this)
 
     public fun devicePtr(stream: CudaStream): Pair<CUdeviceptr, CudaEvent?> =
@@ -317,13 +327,14 @@ public class Device internal constructor(
     }
 
     override fun allocateUninit(dtype: DType, len: Int): Slice {
-        val inner = when (dtype) {
-            DType.F32 -> SliceInner.F32(stream.alloc<Float>(len).getOrThrow())
-            DType.F16 -> SliceInner.F16Val(stream.alloc<F16>(len).getOrThrow())
-            DType.BF16 -> SliceInner.Bf16Val(stream.alloc<BF16>(len).getOrThrow())
-            DType.I32 -> SliceInner.I32(stream.alloc<Int>(len).getOrThrow())
-            DType.I64 -> SliceInner.I64(stream.alloc<Long>(len).getOrThrow())
-        }
+        val inner =
+            when (dtype) {
+                DType.F32 -> SliceInner.F32(stream.alloc<Float>(len).getOrThrow())
+                DType.F16 -> SliceInner.F16Val(stream.alloc<F16>(len).getOrThrow())
+                DType.BF16 -> SliceInner.Bf16Val(stream.alloc<BF16>(len).getOrThrow())
+                DType.I32 -> SliceInner.I32(stream.alloc<Int>(len).getOrThrow())
+                DType.I64 -> SliceInner.I64(stream.alloc<Long>(len).getOrThrow())
+            }
         return Slice(inner, this)
     }
 
@@ -333,11 +344,12 @@ public class Device internal constructor(
         val funcName = if (name != null) "ug_${name}_$kernelId" else "ug_$kernelId"
         gen(cuCode, funcName, kernel)
         val cfg = kernel.launchConfig
-        val launchCfg = LaunchConfig(
-            gridDim = Dim3(cfg.gridDim.toUInt(), 1u, 1u),
-            blockDim = Dim3(cfg.blockDim.toUInt(), 1u, 1u),
-            sharedMemBytes = cfg.sharedMem.toUInt(),
-        )
+        val launchCfg =
+            LaunchConfig(
+                gridDim = Dim3(cfg.gridDim.toUInt(), 1u, 1u),
+                blockDim = Dim3(cfg.blockDim.toUInt(), 1u, 1u),
+                sharedMemBytes = cfg.sharedMem.toUInt(),
+            )
         val func = compileCu(cuCode.toString(), funcName)
         return Func(func, stream, launchCfg)
     }
@@ -345,7 +357,8 @@ public class Device internal constructor(
     override fun run(f: Any, args: List<io.github.kotlinmania.ug.Slice>) {
         require(f is Func) { "f must be ugcuda.runtime.Func" }
         if (f.cfg.blockDim.x == 0u || f.cfg.blockDim.y == 0u || f.cfg.blockDim.z == 0u ||
-            f.cfg.gridDim.x == 0u || f.cfg.gridDim.y == 0u || f.cfg.gridDim.z == 0u) {
+            f.cfg.gridDim.x == 0u || f.cfg.gridDim.y == 0u || f.cfg.gridDim.z == 0u
+        ) {
             return
         }
         val builder = f.builder()

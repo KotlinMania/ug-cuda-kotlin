@@ -2,7 +2,7 @@
 package io.github.kotlinmania.ugcuda
 
 import io.github.kotlinmania.ug.CommonTests
-import io.github.kotlinmania.ug.cpu_runtime.CpuDevice
+import io.github.kotlinmania.ug.cpuruntime.CpuDevice
 import io.github.kotlinmania.ugcuda.runtime.Device
 import kotlin.test.Test
 

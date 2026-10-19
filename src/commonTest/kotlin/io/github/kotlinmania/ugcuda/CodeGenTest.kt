@@ -6,8 +6,6 @@ import io.github.kotlinmania.ug.lang.Arg
 import io.github.kotlinmania.ug.lang.BinaryOp
 import io.github.kotlinmania.ug.lang.LaunchConfig
 import io.github.kotlinmania.ug.lang.ReduceOp
-import io.github.kotlinmania.ug.lang.UnaryOp
-import io.github.kotlinmania.ug.lang.ssa.A as SsaA
 import io.github.kotlinmania.ug.lang.ssa.Instr
 import io.github.kotlinmania.ug.lang.ssa.Kernel
 import io.github.kotlinmania.ug.lang.ssa.KernelArg
@@ -26,6 +24,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import io.github.kotlinmania.ug.lang.ssa.A as SsaA
 
 class CodeGenTest {
     @Test
@@ -67,28 +66,32 @@ class CodeGenTest {
 
     @Test
     fun testSimpleAddCodeGen() {
-        val kernel = Kernel(
-            instrs = listOf(
-                Instr.DefineGlobal(0, DType.F32),
-                Instr.DefineGlobal(1, DType.F32),
-                Instr.DefineGlobal(2, DType.F32),
-                Instr.SpecialInstr(Special.ThreadIdx),
-                Instr.Load(VarId(0), SsaA.Var(VarId(3)), DType.F32),
-                Instr.Load(VarId(1), SsaA.Var(VarId(3)), DType.F32),
-                Instr.Binary(BinaryOp.Add, SsaA.Var(VarId(4)), SsaA.Var(VarId(5)), DType.F32),
-                Instr.Store(VarId(2), SsaA.Var(VarId(3)), SsaA.Var(VarId(6)), DType.F32),
-            ),
-            args = listOf(
-                KernelArg(Arg.ptr(DType.F32), 0),
-                KernelArg(Arg.ptr(DType.F32), 1),
-                KernelArg(Arg.ptr(DType.F32), 2),
-            ),
-            launchConfig = LaunchConfig(gridDim = 1, blockDim = 1024, sharedMem = 0),
-        )
+        val kernel =
+            Kernel(
+                instrs =
+                    listOf(
+                        Instr.DefineGlobal(0, DType.F32),
+                        Instr.DefineGlobal(1, DType.F32),
+                        Instr.DefineGlobal(2, DType.F32),
+                        Instr.SpecialInstr(Special.ThreadIdx),
+                        Instr.Load(VarId(0), SsaA.Var(VarId(3)), DType.F32),
+                        Instr.Load(VarId(1), SsaA.Var(VarId(3)), DType.F32),
+                        Instr.Binary(BinaryOp.Add, SsaA.Var(VarId(4)), SsaA.Var(VarId(5)), DType.F32),
+                        Instr.Store(VarId(2), SsaA.Var(VarId(3)), SsaA.Var(VarId(6)), DType.F32),
+                    ),
+                args =
+                    listOf(
+                        KernelArg(Arg.ptr(DType.F32), 0),
+                        KernelArg(Arg.ptr(DType.F32), 1),
+                        KernelArg(Arg.ptr(DType.F32), 2),
+                    ),
+                launchConfig = LaunchConfig(gridDim = 1, blockDim = 1024, sharedMem = 0),
+            )
 
-        val code = buildString {
-            gen(this, "add_kernel", kernel)
-        }
+        val code =
+            buildString {
+                gen(this, "add_kernel", kernel)
+            }
 
         assertTrue(code.contains("extern \"C\" __global__ void add_kernel("))
         assertTrue(code.contains("float* __var0,"))
@@ -104,25 +107,29 @@ class CodeGenTest {
 
     @Test
     fun testReductionCodeGenIncludesReduceCu() {
-        val kernel = Kernel(
-            instrs = listOf(
-                Instr.DefineGlobal(0, DType.F32),
-                Instr.DefineGlobal(1, DType.F32),
-                Instr.SpecialInstr(Special.ThreadIdx),
-                Instr.Load(VarId(0), SsaA.Var(VarId(2)), DType.F32),
-                Instr.ReduceLocal(ReduceOp.Sum, SsaA.Var(VarId(3)), DType.F32),
-                Instr.Store(VarId(1), SsaA.Constant(Const.I32(0)), SsaA.Var(VarId(4)), DType.F32),
-            ),
-            args = listOf(
-                KernelArg(Arg.ptr(DType.F32), 0),
-                KernelArg(Arg.ptr(DType.F32), 1),
-            ),
-            launchConfig = LaunchConfig(gridDim = 1, blockDim = 32, sharedMem = 0),
-        )
+        val kernel =
+            Kernel(
+                instrs =
+                    listOf(
+                        Instr.DefineGlobal(0, DType.F32),
+                        Instr.DefineGlobal(1, DType.F32),
+                        Instr.SpecialInstr(Special.ThreadIdx),
+                        Instr.Load(VarId(0), SsaA.Var(VarId(2)), DType.F32),
+                        Instr.ReduceLocal(ReduceOp.Sum, SsaA.Var(VarId(3)), DType.F32),
+                        Instr.Store(VarId(1), SsaA.Constant(Const.I32(0)), SsaA.Var(VarId(4)), DType.F32),
+                    ),
+                args =
+                    listOf(
+                        KernelArg(Arg.ptr(DType.F32), 0),
+                        KernelArg(Arg.ptr(DType.F32), 1),
+                    ),
+                launchConfig = LaunchConfig(gridDim = 1, blockDim = 32, sharedMem = 0),
+            )
 
-        val code = buildString {
-            gen(this, "reduce_kernel", kernel)
-        }
+        val code =
+            buildString {
+                gen(this, "reduce_kernel", kernel)
+            }
 
         assertTrue(code.contains("block_reduce_sum"))
         assertTrue(code.contains("warp_reduce_sum"))
