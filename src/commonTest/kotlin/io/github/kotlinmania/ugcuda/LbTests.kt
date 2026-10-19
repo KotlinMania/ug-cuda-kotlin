@@ -1,9 +1,7 @@
 // port-lint: tests tests/lb_tests.rs
 package io.github.kotlinmania.ugcuda
 
-import io.github.kotlinmania.ug.common_tests.lbAdd
-import io.github.kotlinmania.ug.common_tests.lbCat
-import io.github.kotlinmania.ug.common_tests.lbMm
+import io.github.kotlinmania.ug.CommonTests
 import io.github.kotlinmania.ug.cpu_runtime.CpuDevice
 import io.github.kotlinmania.ugcuda.runtime.Device
 import kotlin.test.Test
@@ -13,7 +11,7 @@ class LbTests {
     fun lbCudaAdd() {
         try {
             val dev = Device.new(0)
-            lbAdd(dev)
+            CommonTests.lb.add(dev)
         } catch (_: Throwable) {
             // Hardware CUDA device is not present on non-CUDA CI/local runner
         }
@@ -23,7 +21,7 @@ class LbTests {
     fun lbCudaMm() {
         try {
             val dev = Device.new(0)
-            lbMm(dev)
+            CommonTests.lb.mm(dev)
         } catch (_: Throwable) {
             // Hardware CUDA device is not present on non-CUDA CI/local runner
         }
@@ -31,6 +29,6 @@ class LbTests {
 
     @Test
     fun lbCudaCat() {
-        lbCat(CpuDevice)
+        CommonTests.lb.cat(CpuDevice)
     }
 }
